@@ -13,7 +13,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Real Estate AI API", version="0.1.0")
+app = FastAPI(title="VisionEstate", version="0.1.0")
 
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 pipeline = AIPipeline()

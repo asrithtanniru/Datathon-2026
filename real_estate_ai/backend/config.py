@@ -9,7 +9,7 @@ MODELS_DIR = BASE_DIR / "models"
 UPLOADS_DIR = BASE_DIR / "uploads"
 VECTOR_DB_DIR = BASE_DIR / "vector_db"
 
-CLASSIFIER_PATH = MODELS_DIR / "asrith-test.pth"
+CLASSIFIER_PATH = MODELS_DIR / "model.pth"
 FAISS_INDEX_PATH = VECTOR_DB_DIR / "faiss.index"
 FAISS_METADATA_PATH = VECTOR_DB_DIR / "faiss_metadata.json"
 
