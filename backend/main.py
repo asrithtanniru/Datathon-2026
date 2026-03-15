@@ -46,7 +46,32 @@ async def upload_image(file: UploadFile = File(...)) -> dict:
     destination.write_bytes(file_bytes)
     logger.info("Saved upload: %s", destination.name)
 
-    result = pipeline.process_image(destination, destination.name)
+    try:
+        result = pipeline.process_image(destination, destination.name)
+    except ValueError as e:
+        if destination.exists():
+            destination.unlink()
+        
+        error_msg = str(e)
+        if error_msg.startswith("unknown_image_irrelevant"):
+            score = error_msg.split("|")[1]
+            raise HTTPException(
+                status_code=400,
+                detail=f"Irrelevant image detected (score: {score}). We only accept valid real estate room images."
+            )
+        elif error_msg.startswith("duplicate_image_fraud"):
+            score = error_msg.split("|")[1]
+            raise HTTPException(
+                status_code=409,
+                detail=f"You have uploaded the same image. Don't try to fraud, we have a detection system! (Similarity: {score})"
+            )
+        elif error_msg.startswith("unsupported_room_type"):
+            raise HTTPException(
+                status_code=400,
+                detail="This image is not yet supported. Our system only supports standard indoor rooms."
+            )
+        else:
+            raise HTTPException(status_code=500, detail=str(e))
 
     return {
         "request_id": result["request_id"],

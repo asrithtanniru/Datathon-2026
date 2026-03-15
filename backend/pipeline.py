@@ -37,13 +37,8 @@ class AIPipeline:
         
         logger.info("Classification complete: %s (%.4f)", room_type, confidence)
 
-        # Metadata extraction with timing
-        start_metadata = time.time()
-        metadata = self.metadata_extractor.extract_metadata(
-            image_path=image_path, predicted_room_type=room_type
-        )
-        latencies["latency_ms_metadata"] = (time.time() - start_metadata) * 1000
-        logger.info("Metadata extraction complete for %s", filename)
+        if is_unknown:
+            raise ValueError(f"unknown_image_irrelevant|{confidence:.4f}")
 
         # Image embedding with timing
         start_embedding = time.time()
@@ -60,18 +55,33 @@ class AIPipeline:
         duplicate = is_duplicate_score(top_score, threshold=DUPLICATE_SIMILARITY_THRESHOLD)
         logger.info("Duplicate check score=%.4f duplicate=%s", top_score, duplicate)
 
-        # Store if not duplicate
-        if not duplicate:
-            self.vector_store.add_embedding(
-                embedding=embedding,
-                metadata={
-                    "filename": filename,
-                    "room_type": room_type,
-                    "confidence": confidence,
-                    "metadata": metadata,
-                },
-            )
-            logger.info("Stored embedding for %s", filename)
+        if duplicate:
+            raise ValueError(f"duplicate_image_fraud|{top_score:.4f}")
+
+        # Metadata extraction with timing
+        start_metadata = time.time()
+        metadata = self.metadata_extractor.extract_metadata(
+            image_path=image_path, predicted_room_type=room_type
+        )
+        latencies["latency_ms_metadata"] = (time.time() - start_metadata) * 1000
+        logger.info("Metadata extraction complete for %s", filename)
+
+        # Check if the AI decided it was an unsupported room
+        if metadata and str(metadata.get("room_type", "")).lower().startswith("other"):
+            actual_type = metadata.get("room_type", "other")
+            raise ValueError(f"unsupported_room_type|{actual_type}")
+
+        # Store since not duplicate
+        self.vector_store.add_embedding(
+            embedding=embedding,
+            metadata={
+                "filename": filename,
+                "room_type": room_type,
+                "confidence": confidence,
+                "metadata": metadata,
+            },
+        )
+        logger.info("Stored embedding for %s", filename)
 
         return {
             "request_id": request_id,
