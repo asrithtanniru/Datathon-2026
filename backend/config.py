@@ -12,6 +12,7 @@ VECTOR_DB_DIR = BASE_DIR / "vector_db"
 CLASSIFIER_PATH = MODELS_DIR / "final-model.pth"
 FAISS_INDEX_PATH = VECTOR_DB_DIR / "faiss.index"
 FAISS_METADATA_PATH = VECTOR_DB_DIR / "faiss_metadata.json"
+SQLITE_DB_PATH = VECTOR_DB_DIR / "listings.db"
 
 # Fallback label order when no class_to_idx metadata is found in checkpoint.
 DEFAULT_CLASSES = ["Bathroom", "Bedroom", "Dinning", "Kitchen", "Livingroom"]

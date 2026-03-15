@@ -1,7 +1,21 @@
-import Link from "next/link";
-import { Search } from "lucide-react";
+'use client'
+
+import Link from 'next/link'
+import { Search } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 
 export default function Header() {
+  const router = useRouter()
+  const [query, setQuery] = useState('')
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (query.trim()) {
+      router.push(`/listings?q=${encodeURIComponent(query)}`)
+    }
+  }
+
   return (
     <header className="sticky top-0 z-50 w-full bg-white border-b border-slate-100 shadow-sm">
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
@@ -15,14 +29,16 @@ export default function Header() {
             </Link>
 
             {/* Search Bar - Aceplace style */}
-            <div className="hidden lg:flex flex-1 max-w-xl items-center bg-slate-50 border border-slate-100 rounded-full px-4 py-2.5">
+            <form onSubmit={handleSearch} className="hidden lg:flex flex-1 max-w-xl items-center bg-slate-50 border border-slate-100 rounded-full px-4 py-2.5">
               <Search className="w-5 h-5 text-slate-400 mr-3" />
               <input
                 type="text"
-                placeholder="Search..."
-                className="bg-transparent border-none outline-none w-full text-sm placeholder:text-slate-400"
+                placeholder="Search an image context..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="bg-transparent border-none outline-none w-full text-sm text-slate-900 placeholder:text-slate-400"
               />
-            </div>
+            </form>
           </div>
 
           {/* Right section: Links & Login */}
@@ -40,23 +56,24 @@ export default function Header() {
               <Link href="#" className="hover:text-slate-900 transition-colors ml-4 border-l border-slate-200 pl-8">
                 Contact us
               </Link>
-              
+
               <div className="flex items-center gap-2 ml-4 mr-2">
                 <span className="w-5 h-5 rounded-full bg-blue-100 border border-blue-200 overflow-hidden text-[10px] flex items-center justify-center">🇮🇳</span>
                 <span className="text-sm font-semibold text-slate-900">INR</span>
               </div>
             </nav>
             <div className="flex items-center gap-2 sm:gap-4">
-              <Link href="/broker" className="hidden sm:inline-flex bg-white hover:bg-slate-50 border border-slate-200 text-slate-900 px-4 sm:px-6 py-2.5 rounded-full text-sm font-semibold transition-colors shadow-sm">
+              <Link
+                href="/broker"
+                className="hidden sm:inline-flex bg-white hover:bg-slate-50 border border-slate-200 text-slate-900 px-4 sm:px-6 py-2.5 rounded-full text-sm font-semibold transition-colors shadow-sm"
+              >
                 Post Listing
               </Link>
-              <button className="bg-[#0f172a] hover:bg-black text-white px-6 sm:px-8 py-2.5 rounded-full text-sm sm:text-[15px] font-medium transition-colors shadow-sm">
-                Login
-              </button>
+              {/* <button className="bg-[#0f172a] hover:bg-black text-white px-6 sm:px-8 py-2.5 rounded-full text-sm sm:text-[15px] font-medium transition-colors shadow-sm">Login</button> */}
             </div>
           </div>
         </div>
       </div>
     </header>
-  );
+  )
 }

@@ -1,64 +1,41 @@
+'use client'
+
+import { useEffect, useState, Suspense } from 'react'
+import axios from 'axios'
 import PropertyCard from '@/components/PropertyCard'
 import { ChevronDown, Filter, LayoutGrid, List, Home, Hotel, Building, Tent, MapPin } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
 
-const MOCK_PROPERTIES = [
-  {
-    type: 'VILLA',
-    title: 'Five Palm Jumeirah Beachfront Villa - Pool, Jacuzzi',
-    guests: 8,
-    bedrooms: 4,
-    price: 1920,
-    rating: 4.6,
-    imageUrl: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=800&auto=format&fit=crop',
-  },
-  {
-    type: 'VILLA',
-    title: 'Two Bedroom Arabian Summerhouse Family Suite',
-    guests: 6,
-    bedrooms: 3,
-    price: 890,
-    rating: 3.2,
-    imageUrl: 'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?q=80&w=800&auto=format&fit=crop',
-  },
-  {
-    type: 'VILLA',
-    title: 'Beach Front Villa in Five Palm Jumeirah Hotel',
-    guests: 6,
-    bedrooms: 2,
-    price: 750,
-    rating: 5.0,
-    imageUrl: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=800&auto=format&fit=crop',
-  },
-  {
-    type: 'VILLA',
-    title: 'Arabian Summerhouse Superior',
-    guests: 8,
-    bedrooms: 3,
-    price: 1299,
-    rating: 3.8,
-    imageUrl: 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?q=80&w=800&auto=format&fit=crop',
-  },
-  {
-    type: 'VILLA',
-    title: 'Stylish Luxury Sunshine Villa Perfect for Families',
-    guests: 4,
-    bedrooms: 2,
-    price: 1000,
-    rating: 4.9,
-    imageUrl: 'https://images.unsplash.com/photo-1449844908441-8829872d2607?q=80&w=800&auto=format&fit=crop',
-  },
-  {
-    type: 'VILLA',
-    title: 'Spacious Garden Villa near the Beach',
-    guests: 6,
-    bedrooms: 3,
-    price: 1450,
-    rating: 3.6,
-    imageUrl: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?q=80&w=800&auto=format&fit=crop',
-  },
-]
+function ListingsContent() {
+  const searchParams = useSearchParams()
+  const searchQuery = searchParams.get('q')
 
-export default function ListingsPage() {
+  const [properties, setProperties] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchListings = async () => {
+      setLoading(true)
+      try {
+        if (searchQuery) {
+          const response = await axios.post('http://127.0.0.1:8000/search', {
+            query: searchQuery,
+            top_k: 1,
+          })
+          setProperties(response.data.results || [])
+        } else {
+          const response = await axios.get('http://127.0.0.1:8000/listings')
+          setProperties(response.data)
+        }
+      } catch (error) {
+        console.error('Error fetching listings:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchListings()
+  }, [searchQuery])
+
   return (
     <div className="min-h-screen bg-[#f1f5f9] pb-24">
       <div className="bg-white border-b border-slate-100 px-4 sm:px-6 lg:px-8 py-3 w-full overflow-x-auto overflow-y-hidden shadow-sm sticky top-20 z-40">
@@ -106,9 +83,11 @@ export default function ListingsPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-1 flex items-center gap-2">
-              <span className="text-blue-600 font-black">—</span> Coimbatore, India Villa
+              <span className="text-blue-600 font-black">—</span> {searchQuery ? `AI Search: "${searchQuery}"` : 'Coimbatore, India Villa'}
             </h1>
-            <p className="text-sm text-slate-500 font-medium ml-6">649 Villas available in Coimbatore</p>
+            <p className="text-sm text-slate-500 font-medium ml-6">
+              {properties.length} {searchQuery ? 'matches found based on your prompt' : 'Villas available in Coimbatore'}
+            </p>
           </div>
 
           <div className="flex items-center gap-4">
@@ -130,11 +109,35 @@ export default function ListingsPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-          {MOCK_PROPERTIES.map((property, idx) => (
-            <PropertyCard key={idx} {...property} />
-          ))}
+          {loading ? (
+            <div className="col-span-full py-10 text-center text-slate-500 font-medium">Loading listings...</div>
+          ) : properties.length > 0 ? (
+            properties.map((property: any, idx) => (
+              <PropertyCard
+                key={idx}
+                type={property.category || 'PROPERTY'}
+                title={property.title || 'Untitled Property'}
+                guests={property.guests || 2}
+                bedrooms={property.bedrooms || 1}
+                price={property.price || 0}
+                rating={4.5}
+                score={property.score}
+                imageUrl={`http://127.0.0.1:8000/uploads/${property.image_filename}`}
+              />
+            ))
+          ) : (
+            <div className="col-span-full py-10 text-center text-slate-500 font-medium">No listings found. Be the first to upload!</div>
+          )}
         </div>
       </div>
     </div>
+  )
+}
+
+export default function ListingsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-slate-500 font-medium">Loading AI Engine...</div>}>
+      <ListingsContent />
+    </Suspense>
   )
 }

@@ -34,11 +34,13 @@ class VectorStore:
         faiss.write_index(self.index, str(self.index_path))
         self.metadata_path.write_text(json.dumps(self.records, indent=2))
 
-    def add_embedding(self, embedding: np.ndarray, metadata: dict[str, Any]) -> None:
+    def add_embedding(self, embedding: np.ndarray, metadata: dict[str, Any]) -> int:
         vector = self._normalize(embedding).reshape(1, -1)
+        faiss_id = len(self.records)
         self.index.add(vector.astype(np.float32))
         self.records.append(metadata)
         self._persist()
+        return faiss_id
 
     def search_embedding(self, query_embedding: np.ndarray, top_k: int = 3) -> list[dict[str, Any]]:
         if self.index.ntotal == 0:

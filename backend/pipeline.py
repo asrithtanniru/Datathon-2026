@@ -8,6 +8,7 @@ from .duplicate_detector import is_duplicate_score
 from .embedding import generate_embedding, generate_text_embedding
 from .metadata_extractor import MetadataExtractor
 from .vector_store import VectorStore
+from .database import insert_listing, get_listings_by_faiss_ids, get_all_listings
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +19,10 @@ class AIPipeline:
         self.metadata_extractor = MetadataExtractor()
         self.vector_store = VectorStore()
 
-    def process_image(self, image_path: Path, filename: str) -> dict:
+    def process_image(self, image_path: Path, filename: str, broker_data: dict = None) -> dict:
         logger.info("Starting pipeline for %s", filename)
+        if broker_data is None:
+            broker_data = {}
 
         # Run classification with built-in latency tracking
         classification_result = self.classifier.classify_image(image_path)
@@ -72,7 +75,7 @@ class AIPipeline:
             raise ValueError(f"unsupported_room_type|{actual_type}")
 
         # Store since not duplicate
-        self.vector_store.add_embedding(
+        faiss_id = self.vector_store.add_embedding(
             embedding=embedding,
             metadata={
                 "filename": filename,
@@ -81,7 +84,27 @@ class AIPipeline:
                 "metadata": metadata,
             },
         )
-        logger.info("Stored embedding for %s", filename)
+        logger.info("Stored embedding for %s with faiss_id %s", filename, faiss_id)
+
+        # Merge UI logic & AI metadata into SQLite
+        record_data = {
+            "faiss_id": faiss_id,
+            "title": broker_data.get("title", ""),
+            "location": broker_data.get("location", ""),
+            "price": broker_data.get("price", 0.0),
+            "category": broker_data.get("category", ""),
+            "bedrooms": broker_data.get("bedrooms", 0),
+            "guests": broker_data.get("guests", 0),
+            "image_filename": filename,
+            "ai_room_type": metadata.get("room_type", ""),
+            "ai_design_style": metadata.get("design_style", ""),
+            "ai_lighting": metadata.get("lighting", ""),
+            "ai_features": metadata.get("features", []),
+            "ai_objects": metadata.get("objects", [])
+        }
+        
+        sqlite_id = insert_listing(record_data)
+        logger.info("Stored SQLite listing for %s with id %s", filename, sqlite_id)
 
         return {
             "request_id": request_id,
@@ -102,18 +125,34 @@ class AIPipeline:
         query_embedding = generate_text_embedding(query)
         matches = self.vector_store.search_embedding(query_embedding, top_k=top_k)
 
+        if not matches:
+            return {"query": query, "results": []}
+
+        # Merge FAISS scores into SQLite listings
+        faiss_ids = [m["id"] for m in matches]
+        listings = get_listings_by_faiss_ids(faiss_ids)
+
         results = []
         for match in matches:
-            result = {
-                "score": match["score"],
-                **(match.get("metadata") or {}),
-            }
-            results.append(result)
+            # Find the corresponding sqlite listing
+            listing = next((l for l in listings if l["faiss_id"] == match["id"]), None)
+            if listing:
+                # Add score so frontend can show match percentage if desired
+                listing["score"] = match["score"]
+                # Create the full image URL assuming standard mount locally
+                listing["imageUrl"] = f"http://127.0.0.1:8000/uploads/{listing['image_filename']}"
+                results.append(listing)
 
         return {
             "query": query,
             "results": results,
         }
+
+    def get_all_listings(self) -> dict:
+        listings = get_all_listings()
+        for listing in listings:
+            listing["imageUrl"] = f"http://127.0.0.1:8000/uploads/{listing['image_filename']}"
+        return {"listings": listings}
 
     def vector_stats(self) -> dict:
         return self.vector_store.get_stats()

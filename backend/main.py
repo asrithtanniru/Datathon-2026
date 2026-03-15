@@ -1,11 +1,15 @@
 import logging
 from pathlib import Path
+from typing import Optional
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile, Form
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
 
 from .config import UPLOADS_DIR
 from .pipeline import AIPipeline
+from .database import init_db
 
 logging.basicConfig(
     level=logging.INFO,
@@ -15,7 +19,21 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="VisionEstate", version="0.1.0")
 
+# Enable CORS for Next.js
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Init SQLite DB
+init_db()
+
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
+
 pipeline = AIPipeline()
 
 
@@ -34,7 +52,15 @@ def health_check() -> dict:
 
 
 @app.post("/upload")
-async def upload_image(file: UploadFile = File(...)) -> dict:
+async def upload_image(
+    file: UploadFile = File(...),
+    title: Optional[str] = Form(""),
+    location: Optional[str] = Form(""),
+    price: Optional[float] = Form(0.0),
+    category: Optional[str] = Form(""),
+    bedrooms: Optional[int] = Form(0),
+    guests: Optional[int] = Form(0)
+) -> dict:
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing filename")
 
@@ -45,9 +71,18 @@ async def upload_image(file: UploadFile = File(...)) -> dict:
     file_bytes = await file.read()
     destination.write_bytes(file_bytes)
     logger.info("Saved upload: %s", destination.name)
+    
+    broker_data = {
+        "title": title,
+        "location": location,
+        "price": price,
+        "category": category,
+        "bedrooms": bedrooms,
+        "guests": guests
+    }
 
     try:
-        result = pipeline.process_image(destination, destination.name)
+        result = pipeline.process_image(destination, destination.name, broker_data)
     except ValueError as e:
         if destination.exists():
             destination.unlink()
@@ -87,6 +122,11 @@ async def upload_image(file: UploadFile = File(...)) -> dict:
         "top_predictions": result["top_predictions"],
     }
 
+
+@app.get("/listings")
+def get_listings():
+    import backend.database as db
+    return db.get_all_listings()
 
 @app.post("/search")
 def semantic_search(payload: SearchRequest) -> dict:
